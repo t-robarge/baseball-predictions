@@ -95,8 +95,13 @@ def getTeamStats(team_id, start = f"03/01/{season}", end = f"07/15/{season}"):
                                          'group' : 'hitting', 
                                          'gameType' : 'R', 
                                          'startDate' : start, 
-                                         'endDate' : end})
-    return stats
+                                         'endDate' : end,
+                                         'sportIds':1})
+    splits = stats['stats'][0].get('splits', [])
+    for split in splits:
+        if split.get('team', {}).get('id') == team_id:
+            return split.get('stat')
+    return None
 
 # Endpoint: team_stats
 #   - Doesn't seem to support date ranges (tried to use force = True with start and end date)
@@ -122,4 +127,8 @@ def getTeamStats(team_id, start = f"03/01/{season}", end = f"07/15/{season}"):
 # gamePks = getGamePks(team_ids)
 
 # Testing
-# print(getTeamStats(133))
+print(getTeamStats(133))
+
+gameTypes = statsapi.get("meta",{
+                     "type":"platforms"})
+#print(gameTypes)
