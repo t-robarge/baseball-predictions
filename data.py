@@ -89,10 +89,10 @@ def getGamePks(team_ids):
 # Endpoint: teams_stats
 #   - Supports date ranges
 #   - Is not returning MLB teams atm
-def getTeamStats(team_id, start = f"03/01/{season}", end = f"07/15/{season}"):
+def getTeamStats(team_id, start = f"03/01/{season}", end = f"07/15/{season}",group='hitting'):
     stats = statsapi.get("teams_stats", {'stats' : 'byDateRange', 
                                          'season' : season, 
-                                         'group' : 'hitting', 
+                                         'group' : group, 
                                          'gameType' : 'R', 
                                          'startDate' : start, 
                                          'endDate' : end,
@@ -127,8 +127,36 @@ def getTeamStats(team_id, start = f"03/01/{season}", end = f"07/15/{season}"):
 # gamePks = getGamePks(team_ids)
 
 # Testing
-print(getTeamStats(133))
+#print(getTeamStats(133,group='pitching'))
 
 gameTypes = statsapi.get("meta",{
-                     "type":"platforms"})
+                     "type":"statGroups"})
 #print(gameTypes)
+
+def getStat(start = f"03/01/{season}", end = f"07/15/{season}",group='pitching',stat='era'):
+    stat_dic = {}
+    stats = statsapi.get("teams_stats", {'stats' : 'byDateRange', 
+                                         'season' : season, 
+                                         'group' : group, 
+                                         'gameType' : 'R', 
+                                         'startDate' : start, 
+                                         'endDate' : end,
+                                         'sportIds':1})
+    splits = stats['stats'][0].get('splits', [])    
+    for split in splits:
+        stat_dic[split['team']['id']] = split['stat'][stat]
+    return stat_dic
+
+def CompileTeamData():
+    team_list = getTeamIds().values()
+    my_dict = {team: {} for team in team_list}
+    ## MAIN LOGIC
+    stats_needed = [('era','pitching'),('avg','hitting')]
+    for my_stat in stats_needed:
+        dic = getStat(stat=my_stat[0],group=my_stat[1])
+        for team_id in team_list:
+            my_dict[team_id][my_stat[0]] = dic[team_id]
+    ###############
+
+    return my_dict
+print(CompileTeamData())
