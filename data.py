@@ -181,3 +181,17 @@ def ExporttoCSV(data):
 data = CompileTeamData()
 ExporttoCSV(data)
 
+def addWinsFeature(stat_dict, season=season):
+    stats = statsapi.get("standings", {'season' : season, 
+                                       'sportIds':1,
+                                       'leagueId': "103,104"})
+    for division in stats['records']:
+        for team in division['teamRecords']:
+            stat_dict[team['team']['id']]['wins'] = team['wins']
+
+    return
+
+stats_dict = CompileTeamData()
+addWinsFeature(stats_dict)
+print(stats_dict)
+
