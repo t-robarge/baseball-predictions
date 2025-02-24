@@ -3,7 +3,7 @@ import pandas as pd
 
 ver = "1.8.1"
 season = "2021"
-
+# League IDs: AL - 103, NL - 104, for both, put in string: "103,104"
 '''
 All available stat parameter types:
 
