@@ -2,7 +2,7 @@ import statsapi
 import pandas as pd
 
 ver = "1.8.1"
-season = "2021"
+#season = "2021"
 # League IDs: AL - 103, NL - 104, for both, put in string: "103,104"
 '''
 All available stat parameter types:
@@ -67,7 +67,7 @@ All available stat parameter types:
 '''
 
 def getTeamIds():
-    teams = statsapi.get('teams', {'season': season, 'sportId': 1})
+    teams = statsapi.get('teams', {'season': 2021, 'sportId': 1})
     return {team['abbreviation']: team['id'] for team in teams['teams']}
 
 def getGamePks(team_ids):
@@ -90,6 +90,7 @@ def getGamePks(team_ids):
 # Endpoint: teams_stats
 #   - Supports date ranges
 #   - Is not returning MLB teams atm
+'''
 def getTeamStats(team_id, start = f"03/01/{season}", end = f"07/15/{season}",group='hitting'):
     stats = statsapi.get("teams_stats", {'stats' : 'byDateRange', 
                                          'season' : season, 
@@ -104,7 +105,7 @@ def getTeamStats(team_id, start = f"03/01/{season}", end = f"07/15/{season}",gro
         if split.get('team', {}).get('id') == team_id:
             return split.get('stat')
     return None
-
+'''
 # Endpoint: team_stats
 #   - Doesn't seem to support date ranges (tried to use force = True with start and end date)
 #   - WORKS FOR FULL SEASON if we want to try that (change 'group' parameter for different stat types)
@@ -134,30 +135,41 @@ def getTeamStats(team_id, start = f"03/01/{season}", end = f"07/15/{season}"):
 gameTypes = statsapi.get("meta",{
                      "type":"statGroups"})
 #print(gameTypes)
-
-def getStat(start = f"03/01/{season}", end = f"07/15/{season}",group='pitching',stat='era'):
+## variation in games played. If needed, fine tune date range to limit variation
+def getStat(group='pitching',stat='era',season=0):
     stat_dic = {}
     stats = statsapi.get("teams_stats", {'stats' : 'byDateRange', 
                                          'season' : season, 
                                          'group' : group, 
                                          'gameType' : 'R', 
-                                         'startDate' : start, 
-                                         'endDate' : end,
+                                         'startDate' : f"03/01/{season}", 
+                                         'endDate' : f"07/07/{season}",
                                          'sportIds':1},)
     splits = stats['stats'][0].get('splits', [])    
     for split in splits:
         stat_dic[split['team']['id']] = split['stat'][stat]
     return stat_dic
 
-def CompileTeamData():
-    team_list = getTeamIds().values()
-    my_dict = {team: {} for team in team_list}
+def CompileTeamData(team_list,my_dict,season):
     ## MAIN LOGIC
-    stats_needed = [('era','pitching'),('avg','hitting')]
+    stats_needed = [('era','pitching'),('avg','hitting'),('wins','pitching'),('obp', 'hitting'),('slg','hitting'),('ops','hitting'),('stolenBases','hitting'),('leftOnBase','hitting'),('runs','hitting'),('whip','pitching'),('runs','pitching'),('blownSaves','pitching'),('strikeoutWalkRatio','pitching')]
     for my_stat in stats_needed:
-        dic = getStat(stat=my_stat[0],group=my_stat[1])
+        dic = getStat(stat=my_stat[0],group=my_stat[1],season=season)
         for team_id in team_list:
-            my_dict[team_id][my_stat[0]] = dic[team_id]
+            ## separate mid-season wins from prediction label
+            if my_stat[0] =='wins':
+                my_dict[season*1000+team_id]['cur_wins'] = dic[team_id]
+            ## separate runs against from runs earned
+            elif my_stat[0]=='runs' and my_stat[1]=='pitching':
+                my_dict[season*1000+team_id]['runs_against'] = dic[team_id]
+            ## normal case
+            else: my_dict[season*1000+team_id][my_stat[0]] = dic[team_id]
+    stats = statsapi.get("standings", {'season' : season, 
+                                       'sportIds':1,
+                                       'leagueId': "103,104"})
+    for division in stats['records']:
+        for team in division['teamRecords']:
+            my_dict[season*1000+team['team']['id']]['wins'] = team['wins']
     ###############
 
     return my_dict
@@ -178,20 +190,18 @@ def ExporttoCSV(data):
     df.to_csv("mlb_stats.csv")
 
 
-data = CompileTeamData()
-ExporttoCSV(data)
+## main
+season_list=[]
+for i in range(2013,2025):
+    if i!=2020:
+        season_list.append(i)
 
-def addWinsFeature(stat_dict, season=season):
-    stats = statsapi.get("standings", {'season' : season, 
-                                       'sportIds':1,
-                                       'leagueId': "103,104"})
-    for division in stats['records']:
-        for team in division['teamRecords']:
-            stat_dict[team['team']['id']]['wins'] = team['wins']
-
-    return
-
-stats_dict = CompileTeamData()
-addWinsFeature(stats_dict)
-print(stats_dict)
-
+# get teamids
+team_list = getTeamIds().values()
+# init dic with sample labels
+my_dict = {season*1000+team: {} for team in team_list for season in season_list}
+for i in range(2013,2025):
+    if i==2020:
+        continue
+    CompileTeamData(team_list,my_dict,i)
+ExporttoCSV(my_dict)
