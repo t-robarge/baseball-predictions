@@ -1,4 +1,5 @@
 import statsapi
+import pandas as pd
 
 ver = "1.8.1"
 season = "2021"
@@ -96,7 +97,8 @@ def getTeamStats(team_id, start = f"03/01/{season}", end = f"07/15/{season}",gro
                                          'gameType' : 'R', 
                                          'startDate' : start, 
                                          'endDate' : end,
-                                         'sportIds':1})
+                                         'sportIds':1,
+                                         })
     splits = stats['stats'][0].get('splits', [])
     for split in splits:
         if split.get('team', {}).get('id') == team_id:
@@ -141,7 +143,7 @@ def getStat(start = f"03/01/{season}", end = f"07/15/{season}",group='pitching',
                                          'gameType' : 'R', 
                                          'startDate' : start, 
                                          'endDate' : end,
-                                         'sportIds':1})
+                                         'sportIds':1},)
     splits = stats['stats'][0].get('splits', [])    
     for split in splits:
         stat_dic[split['team']['id']] = split['stat'][stat]
@@ -159,4 +161,23 @@ def CompileTeamData():
     ###############
 
     return my_dict
-print(CompileTeamData())
+
+def ExporttoCSV(data):
+    """
+    Takes a nested dictionary of obvs, features as a parameter in the form:
+    {obs : {feature name: feature value}}. Outputs a labeled csv file using Pandas
+    """
+
+    # Convert  dictionary to a DataFrame.
+    # Using orient='index' means each key becomes a row index.
+    df = pd.DataFrame.from_dict(data, orient='index')
+
+    df.index.name = "team_id"
+
+    # Write the DataFrame to a CSV file.
+    df.to_csv("mlb_stats.csv")
+
+
+data = CompileTeamData()
+ExporttoCSV(data)
+
