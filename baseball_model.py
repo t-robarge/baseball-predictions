@@ -185,7 +185,7 @@ class Main:
             print(group.drop(columns=['Division']))
         
         # Create a new table with division name and both metrics
-        print(f"Mid-Season Wins Accuracy: {mid_season_accuracy*100:.2f}%")
+        print(f"\nMid-Season Wins Accuracy: {mid_season_accuracy*100:.2f}%")
         print(f"Predicted Wins Accuracy: {predicted_accuracy*100:.2f}%")
 
     def calculate_ranking_accuracy(self, predicted, actual):
