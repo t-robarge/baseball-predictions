@@ -4,7 +4,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
 import statsapi
-from scipy.stats import spearmanr  # Import Spearman correlation
+from scipy.stats import spearmanr
 
 class DataFetcher:
     def __init__(self):
@@ -94,6 +94,9 @@ class Main:
         self.data_fetcher = DataFetcher()
         self.data_processor = DataProcessor()
         self.model_trainer = ModelTrainer()
+        self.midseason_accuracy = None
+        self.prediction_accuracy = None
+        self.test = False
 
         # Set pandas display options to prevent truncation
         pd.set_option('display.max_rows', None)
@@ -101,8 +104,12 @@ class Main:
         pd.set_option('display.width', 1000)
         pd.set_option('display.expand_frame_repr', False)
 
-    def run(self):
-        projection_year = self.get_projection_year()
+    def run(self, season = None, test = False, ):
+        if test:
+            projection_year = season
+            self.test = True
+        else:
+            projection_year = self.get_projection_year()
         season_list = self.get_season_list(projection_year)
         team_list = self.data_fetcher.team_ids.values()
 
@@ -111,6 +118,8 @@ class Main:
 
         # Preprocess, train, and evaluate the model
         self.train_and_evaluate_model(projection_year)
+
+        return 
 
     def get_projection_year(self):
         return int(input("Enter the year you would like to project: "))
@@ -146,12 +155,12 @@ class Main:
         # Make predictions and evaluate the model
         y_pred = self.model_trainer.predict(df_scaled_test)
         rmse = self.model_trainer.evaluate(y_labels_test, y_pred)
-        print(f"RMSE for {projection_year}:", rmse)
+        if not self.test: print(f"RMSE for {projection_year}:", rmse)
 
         # Display results
-        self.display_results(df_scaled_test, y_labels_test, y_pred, mid_season_wins_test, projection_year)
+        self.display_standings(df_scaled_test, y_labels_test, y_pred, mid_season_wins_test, projection_year)
 
-    def display_results(self, df_scaled_test, y_labels_test, y_pred, mid_season_wins_test, projection_year):
+    def display_standings(self, df_scaled_test, y_labels_test, y_pred, mid_season_wins_test, projection_year):
         # Create a mapping of team IDs to abbreviations
         team_id_to_abbreviation = {team_id: abbrev for abbrev, team_id in self.data_fetcher.team_ids.items()}
 
@@ -175,18 +184,21 @@ class Main:
         # Calculate ranking accuracy for mid-season wins and predicted wins
         mid_season_accuracy = self.calculate_ranking_accuracy(results_df['Mid-Season Wins'], results_df['Actual Wins'])
         predicted_accuracy = self.calculate_ranking_accuracy(results_df['Predicted Wins'], results_df['Actual Wins'])
-
+        self.midseason_accuracy = mid_season_accuracy
+        self.prediction_accuracy = predicted_accuracy
 
         # Sort and display results
         results_df = results_df.sort_values(by=['Division', 'Predicted Wins'], ascending=[True, False])
-        print("\nResults for the Projection Year (Grouped by Division, Ordered by Predicted Wins):")
-        for division, group in results_df.groupby('Division'):
-            print(f"\n{division}")
-            print(group.drop(columns=['Division']))
-        
+        if not self.test:
+            print("\nResults for the Projection Year (Grouped by Division, Ordered by Predicted Wins):")
+            for division, group in results_df.groupby('Division'):
+                print(f"\n{division}")
+                print(group.drop(columns=['Division']))
+            
         # Create a new table with division name and both metrics
-        print(f"\nMid-Season Wins Accuracy: {mid_season_accuracy*100:.2f}%")
-        print(f"Predicted Wins Accuracy: {predicted_accuracy*100:.2f}%")
+        if not self.test:
+            print(f"\nMid-Season Wins Accuracy: {mid_season_accuracy*100:.2f}%")
+            print(f"Predicted Wins Accuracy: {predicted_accuracy*100:.2f}%")
 
     def calculate_ranking_accuracy(self, predicted, actual):
         # Calculate Spearman correlation coefficient
@@ -200,22 +212,19 @@ class Main:
 
         for division in standings['records']:
             division_id = division['division']['id']
-            league_id = division['league']['id']
 
-            if league_id == 103:  # American League (AL)
-                if division_id == 201:
-                    division_name = "AL East"
-                elif division_id == 202:
-                    division_name = "AL Central"
-                elif division_id == 200:
-                    division_name = "AL West"
-            elif league_id == 104:  # National League (NL)
-                if division_id == 204:
-                    division_name = "NL East"
-                elif division_id == 205:
-                    division_name = "NL Central"
-                elif division_id == 203:
-                    division_name = "NL West"
+            if division_id == 201:
+                division_name = "AL East"
+            elif division_id == 202:
+                division_name = "AL Central"
+            elif division_id == 200:
+                division_name = "AL West"
+            elif division_id == 204:
+                division_name = "NL East"
+            elif division_id == 205:
+                division_name = "NL Central"
+            elif division_id == 203:
+                division_name = "NL West"
 
             for team in division['teamRecords']:
                 team_abbrev = team_id_to_abbreviation[team['team']['id']]
@@ -227,3 +236,15 @@ class Main:
 if __name__ == "__main__":
     main = Main()
     main.run()
+
+    ##### For testing full range #####
+    # mid_acc = []
+    # pred_acc = []
+    # for year in range(2008,2025):
+    #     if year != 2020:
+    #         print(f"Running for projection year: {year}")
+    #         main.run(season=year, test=True)
+    #         mid_acc.append(main.midseason_accuracy)
+    #         pred_acc.append(main.prediction_accuracy)
+    # print(f"Overall Midseason Accuracy: {sum(mid_acc)/len(mid_acc)}")
+    # print(f"Overall Prediction Accuracy: {sum(pred_acc)/len(pred_acc)}")
