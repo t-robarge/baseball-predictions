@@ -1,11 +1,7 @@
 import pandas as pd
-import matplotlib.pyplot as plt
-import numpy as np
-from scipy.stats import poisson
-from sklearn.linear_model import LogisticRegression, BayesianRidge, LinearRegression, Ridge, PoissonRegressor
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
-from sklearn.model_selection import train_test_split
 from sklearn.linear_model import BayesianRidge
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
 import statsapi
 
@@ -36,10 +32,6 @@ class DataFetcher:
                         ('slg', 'hitting'), ('ops', 'hitting'), ('stolenBases', 'hitting'), ('leftOnBase', 'hitting'),
                         ('runs', 'hitting'), ('whip', 'pitching'), ('runs', 'pitching'), ('blownSaves', 'pitching'),
                         ('strikeoutWalkRatio', 'pitching')]
-        # stats_needed = [('era', 'pitching'), ('avg', 'hitting'), ('wins', 'pitching'), ('obp', 'hitting'),
-        #                 ('slg', 'hitting'), ('ops', 'hitting'), ('stolenBases', 'hitting'), ('leftOnBase', 'hitting'),
-        #                 ('runs', 'hitting'), ('whip', 'pitching'), ('runs', 'pitching'), ('blownSaves', 'pitching'),
-        #                 ('strikeoutWalkRatio', 'pitching')]
         for my_stat in stats_needed:
             dic = self.get_stat(stat=my_stat[0], group=my_stat[1], season=season)
             for team_id in team_list:
@@ -61,6 +53,7 @@ class DataFetcher:
         df = pd.DataFrame.from_dict(data, orient='index')
         df.index.name = "team_id"
         df.to_csv(filename, index=True)
+
 
 class DataProcessor:
     def __init__(self, filename="mlb_stats.csv"):
@@ -108,43 +101,56 @@ class Main:
         pd.set_option('display.expand_frame_repr', False)
 
     def run(self):
-        # Take user input for the projection year
-        projection_year = int(input("Enter the year you would like to project: "))
-
-        # Define the season list, excluding the projection year
-        season_list = [i for i in range(2013, 2025) if i != 2020 and i != projection_year]
-
-        # Fetch and compile training data (excluding the projection year)
+        projection_year = self.get_projection_year()
+        season_list = self.get_season_list(projection_year)
         team_list = self.data_fetcher.team_ids.values()
-        my_dict = {season * 1000 + team: {} for team in team_list for season in season_list}
+
+        # Fetch and compile training and test data
+        self.compile_and_export_data(team_list, season_list, projection_year)
+
+        # Preprocess, train, and evaluate the model
+        self.train_and_evaluate_model(projection_year)
+
+    def get_projection_year(self):
+        return int(input("Enter the year you would like to project: "))
+
+    def get_season_list(self, projection_year):
+        return [i for i in range(2013, 2025) if i != 2020 and i != projection_year]
+
+    def compile_and_export_data(self, team_list, season_list, projection_year):
+        # Compile and export training data
+        training_data = {season * 1000 + team: {} for team in team_list for season in season_list}
         for season in season_list:
-            my_dict = self.data_fetcher.compile_team_data(team_list, my_dict, season)
-        self.data_fetcher.export_to_csv(my_dict, filename="mlb_stats_training.csv")
+            training_data = self.data_fetcher.compile_team_data(team_list, training_data, season)
+        self.data_fetcher.export_to_csv(training_data, filename="mlb_stats_training.csv")
 
-        # Fetch and compile data for the projection year (test data)
-        projection_dict = {projection_year * 1000 + team: {} for team in team_list}
-        projection_dict = self.data_fetcher.compile_team_data(team_list, projection_dict, projection_year)
-        self.data_fetcher.export_to_csv(projection_dict, filename="mlb_stats_test.csv")
+        # Compile and export test data
+        test_data = {projection_year * 1000 + team: {} for team in team_list}
+        test_data = self.data_fetcher.compile_team_data(team_list, test_data, projection_year)
+        self.data_fetcher.export_to_csv(test_data, filename="mlb_stats_test.csv")
 
+    def train_and_evaluate_model(self, projection_year):
         # Preprocess training data
-        self.data_processor = DataProcessor(filename="mlb_stats_training.csv")  # Reload training data
+        self.data_processor = DataProcessor(filename="mlb_stats_training.csv")
         df_scaled, y_labels, mid_season_wins = self.data_processor.preprocess_data()
         X_train, X_test, y_train, y_test = self.data_processor.split_data(df_scaled, y_labels)
 
-        # Train the model on the training data
+        # Train the model
         self.model_trainer.train(X_train, y_train)
 
-        # Preprocess test data (projection year)
-        self.data_processor = DataProcessor(filename="mlb_stats_test.csv")  # Reload test data
+        # Preprocess test data
+        self.data_processor = DataProcessor(filename="mlb_stats_test.csv")
         df_scaled_test, y_labels_test, mid_season_wins_test = self.data_processor.preprocess_data()
 
-        # Make predictions for the projection year
+        # Make predictions and evaluate the model
         y_pred = self.model_trainer.predict(df_scaled_test)
-
-        # Evaluate the model on the projection year
         rmse = self.model_trainer.evaluate(y_labels_test, y_pred)
         print(f"RMSE for {projection_year}:", rmse)
 
+        # Display results
+        self.display_results(df_scaled_test, y_labels_test, y_pred, mid_season_wins_test, projection_year)
+
+    def display_results(self, df_scaled_test, y_labels_test, y_pred, mid_season_wins_test, projection_year):
         # Create a mapping of team IDs to abbreviations
         team_id_to_abbreviation = {team_id: abbrev for abbrev, team_id in self.data_fetcher.team_ids.items()}
 
@@ -156,82 +162,23 @@ class Main:
         }, index=df_scaled_test.index)
 
         # Map team IDs to abbreviations
-        results_df.index = results_df.index.map(lambda x: team_id_to_abbreviation[x % 1000])  # Extract team ID and map to abbreviation
+        results_df.index = results_df.index.map(lambda x: team_id_to_abbreviation[x % 1000])
 
         # Add the 'Difference' column
         results_df['Difference'] = results_df['Actual Wins'] - results_df['Predicted Wins']
 
-        # Create a mapping of team abbreviations to divisions
+        # Add division information
         division_mapping = self.get_division_mapping(projection_year)
-
-        # Add division information to the results DataFrame
         results_df['Division'] = results_df.index.map(division_mapping)
 
-        # Sort the DataFrame by division and then by 'Predicted Wins' in descending order
+        # Sort and display results
         results_df = results_df.sort_values(by=['Division', 'Predicted Wins'], ascending=[True, False])
-
         print("\nResults for the Projection Year (Grouped by Division, Ordered by Predicted Wins):")
         for division, group in results_df.groupby('Division'):
             print(f"\nDivision: {division}")
-            print(group.drop(columns=['Division']))  # Drop the 'Division' column for cleaner output
-    
-    def test(self):
-        # Take user input for the projection year
-        projection_year = int(input("Enter the year you would like to project: "))
-
-        # Preprocess training data
-        self.data_processor = DataProcessor(filename="mlb_stats_training.csv")  # Reload training data
-        df_scaled, y_labels, mid_season_wins = self.data_processor.preprocess_data()
-        X_train, X_test, y_train, y_test = self.data_processor.split_data(df_scaled, y_labels)
-
-        # Train the model on the training data
-        self.model_trainer.train(X_train, y_train)
-
-        # Preprocess test data (projection year)
-        self.data_processor = DataProcessor(filename="mlb_stats_test.csv")  # Reload test data
-        df_scaled_test, y_labels_test, mid_season_wins_test = self.data_processor.preprocess_data()
-
-        # Make predictions for the projection year
-        y_pred = self.model_trainer.predict(df_scaled_test)
-
-        # Evaluate the model on the projection year
-        rmse = self.model_trainer.evaluate(y_labels_test, y_pred)
-        print(f"RMSE for {projection_year}:", rmse)
-
-        # Create a mapping of team IDs to abbreviations
-        team_id_to_abbreviation = {team_id: abbrev for abbrev, team_id in self.data_fetcher.team_ids.items()}
-
-        # Replace team IDs with abbreviations in the results DataFrame
-        results_df = pd.DataFrame({
-            'Mid-Season Wins': mid_season_wins_test.loc[df_scaled_test.index],
-            'Actual Wins': y_labels_test,
-            'Predicted Wins': y_pred
-        }, index=df_scaled_test.index)
-
-        # Map team IDs to abbreviations
-        results_df.index = results_df.index.map(lambda x: team_id_to_abbreviation[x % 1000])  # Extract team ID and map to abbreviation
-
-        # Add the 'Difference' column
-        results_df['Difference'] = results_df['Actual Wins'] - results_df['Predicted Wins']
-
-        # Create a mapping of team abbreviations to divisions
-        division_mapping = self.get_division_mapping(projection_year)
-
-        # Add division information to the results DataFrame
-        results_df['Division'] = results_df.index.map(division_mapping)
-
-        # Sort the DataFrame by division and then by 'Predicted Wins' in descending order
-        results_df = results_df.sort_values(by=['Division', 'Predicted Wins'], ascending=[True, False])
-
-        print("\nResults for the Projection Year (Grouped by Division, Ordered by Predicted Wins):")
-        for division, group in results_df.groupby('Division'):
-            print(f"\nDivision: {division}")
-            print(group.drop(columns=['Division']))  # Drop the 'Division' column for cleaner output
+            print(group.drop(columns=['Division']))
 
     def get_division_mapping(self, year):
-        """
-        Fetch division information for all teams in the specified year and return a mapping of team abbreviations to divisions.
-        """
         standings = statsapi.get("standings", {'season': year, 'sportIds': 1, 'leagueId': "103,104"})
         division_mapping = {}
         team_id_to_abbreviation = {team_id: abbrev for abbrev, team_id in self.data_fetcher.team_ids.items()}
@@ -240,7 +187,6 @@ class Main:
             division_id = division['division']['id']
             league_id = division['league']['id']
 
-            # Map division IDs to division names
             if league_id == 103:  # American League (AL)
                 if division_id == 201:
                     division_name = "AL East"
@@ -261,9 +207,8 @@ class Main:
                 division_mapping[team_abbrev] = division_name
 
         return division_mapping
-    
+
+
 if __name__ == "__main__":
     main = Main()
-    # Use if data is already generated and just testing model
-    # main.test()
     main.run()
