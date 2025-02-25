@@ -4,6 +4,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
 import statsapi
+from scipy.stats import spearmanr  # Import Spearman correlation
 
 class DataFetcher:
     def __init__(self):
@@ -171,12 +172,26 @@ class Main:
         division_mapping = self.get_division_mapping(projection_year)
         results_df['Division'] = results_df.index.map(division_mapping)
 
+        # Calculate ranking accuracy for mid-season wins and predicted wins
+        mid_season_accuracy = self.calculate_ranking_accuracy(results_df['Mid-Season Wins'], results_df['Actual Wins'])
+        predicted_accuracy = self.calculate_ranking_accuracy(results_df['Predicted Wins'], results_df['Actual Wins'])
+
+
         # Sort and display results
         results_df = results_df.sort_values(by=['Division', 'Predicted Wins'], ascending=[True, False])
         print("\nResults for the Projection Year (Grouped by Division, Ordered by Predicted Wins):")
         for division, group in results_df.groupby('Division'):
             print(f"\nDivision: {division}")
             print(group.drop(columns=['Division']))
+        
+        # Create a new table with division name and both metrics
+        print(f"Mid-Season Wins Accuracy: {mid_season_accuracy*100:.2f}%")
+        print(f"Predicted Wins Accuracy: {predicted_accuracy*100:.2f}%")
+
+    def calculate_ranking_accuracy(self, predicted, actual):
+        # Calculate Spearman correlation coefficient
+        correlation, _ = spearmanr(predicted, actual)
+        return correlation
 
     def get_division_mapping(self, year):
         standings = statsapi.get("standings", {'season': year, 'sportIds': 1, 'leagueId': "103,104"})
