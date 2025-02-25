@@ -181,7 +181,7 @@ class Main:
         results_df = results_df.sort_values(by=['Division', 'Predicted Wins'], ascending=[True, False])
         print("\nResults for the Projection Year (Grouped by Division, Ordered by Predicted Wins):")
         for division, group in results_df.groupby('Division'):
-            print(f"\nDivision: {division}")
+            print(f"\n{division}")
             print(group.drop(columns=['Division']))
         
         # Create a new table with division name and both metrics
