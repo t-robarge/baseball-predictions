@@ -1,3 +1,7 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from baseball import *
+
 '''
 ## try neg binomial - not working atm
 X_train = sm.add_constant(X_train)
@@ -9,7 +13,7 @@ print(y_pred)
 '''
 
 #PLOT SHIT
-'''
+# '''
 lambda_est = np.mean(y_labels) + 1
 # Create a histogram of the count data
 bins = np.arange(y_labels.min(), y_labels.max() + 2) - 0.5  # bins for integer counts
@@ -30,4 +34,4 @@ plt.ylabel("Probability")
 plt.title("Count Data Histogram and Poisson PMF Overlay")
 plt.legend()
 plt.show()
-'''
+# '''
