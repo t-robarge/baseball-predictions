@@ -1,0 +1,12 @@
+numpy
+numpyro
+pymc
+pytensor
+arviz
+jax
+matplotlib
+MLB-StatsAPI
+pandas
+scipy
+statsmodels
+scikit-learn
