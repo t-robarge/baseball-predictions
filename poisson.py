@@ -65,4 +65,9 @@ az.plot_posterior(trace)
 
 # 🔹 Evaluate predictions
 
-print("MAE on Test Set:", mean_absolute_error(y_test, y_pred))
+plt.xlabel("Count")
+plt.ylabel("Probability")
+plt.title("Count Data Histogram and Poisson PMF Overlay")
+plt.legend()
+plt.show()
+'''
