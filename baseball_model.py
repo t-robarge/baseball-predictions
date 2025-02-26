@@ -1,7 +1,6 @@
 import pandas as pd
 from sklearn.linear_model import BayesianRidge
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
 import statsapi
 from scipy.stats import spearmanr
@@ -29,19 +28,100 @@ class DataFetcher:
         return stat_dic
 
     def compile_team_data(self, team_list, my_dict, season):
-        stats_needed = [('era', 'pitching'), ('wins', 'pitching'),
-                        ('slg', 'hitting'), ('ops', 'hitting'), ('stolenBases', 'hitting'), ('leftOnBase', 'hitting'),
-                        ('runs', 'hitting'), ('whip', 'pitching'), ('runs', 'pitching'), ('blownSaves', 'pitching'),
-                        ('strikeoutWalkRatio', 'pitching')]
+        stats_needed = [
+            ('runs', 'pitching'),
+            ('era', 'pitching'),
+            ('whip', 'pitching'),
+            ('wins', 'pitching'),
+            ('strikeoutWalkRatio', 'pitching'),
+            ('ops', 'pitching'),
+            ('ops', 'hitting'),
+            ('leftOnBase', 'hitting'),
+            ('runs', 'hitting'),
+            ('hits', 'hitting'),
+            ('avg', 'hitting'),
+            # ('earnedRuns', 'pitching'),
+            # ('slg', 'hitting'),
+            # ('obp', 'hitting'),
+            # ('stolenBases', 'hitting'),
+            # ('blownSaves', 'pitching'),
+            # ('groundOuts', 'hitting'),
+            # ('airOuts', 'hitting'),
+            # ('doubles', 'hitting'),
+            # ('triples', 'hitting'),
+            # ('homeRuns', 'hitting'),
+            # ('strikeOuts', 'hitting'),
+            # ('baseOnBalls', 'hitting'),
+            # ('intentionalWalks', 'hitting'),
+            # ('hitByPitch', 'hitting'),
+            # ('atBats', 'hitting'),
+            # ('caughtStealing', 'hitting'),
+            # ('stolenBasePercentage', 'hitting'),
+            # ('groundIntoDoublePlay', 'hitting'),
+            # ('numberOfPitches', 'hitting'),
+            # ('plateAppearances', 'hitting'),
+            # ('totalBases', 'hitting'),
+            # ('rbi', 'hitting'),
+            # ('sacBunts', 'hitting'),
+            # ('sacFlies', 'hitting'),
+            # ('groundOuts', 'pitching'),
+            # ('airOuts', 'pitching'),
+            # ('doubles', 'pitching'),
+            # ('triples', 'pitching'),
+            # ('strikeOuts', 'pitching'),
+            # ('hitByPitch', 'pitching'),
+            # ('avg', 'pitching'),
+            # ('obp', 'pitching'),
+            # ('slg', 'pitching'),
+            # ('atBats', 'pitching'),
+            # ('caughtStealing', 'pitching'),
+            # ('stolenBases', 'pitching'),
+            # ('stolenBasePercentage', 'pitching'),
+            # ('groundIntoDoublePlay', 'pitching'),
+            # ('saveOpportunities', 'pitching'),
+            # ('holds', 'pitching'),
+            # ('battersFaced', 'pitching'),
+            # ('outs', 'pitching'),
+            # ('shutouts', 'pitching'),
+            # ('strikes', 'pitching'),
+            # ('strikePercentage', 'pitching'),
+            # ('hitBatsmen', 'pitching'),
+            # ('balks', 'pitching'),
+            # ('wildPitches', 'pitching'),
+            # ('pickoffs', 'pitching'),
+            # ('totalBases', 'pitching'),
+            # ('groundOutsToAirouts', 'pitching'),
+            # ('pitchesPerInning', 'pitching'),
+            # ('strikeoutsPer9Inn', 'pitching'),
+            # ('walksPer9Inn', 'pitching'),
+            # ('hitsPer9Inn', 'pitching'),
+            # ('runsScoredPer9', 'pitching'),
+            # ('homeRunsPer9', 'pitching'),
+        ]
+        gp_dict = dict()
+        gp = statsapi.get("teams_stats", {'stats': 'byDateRange',
+                                             'season': season,
+                                             'group': "hitting",
+                                             'gameType': 'R',
+                                             'startDate': f"03/01/{season}",
+                                             'endDate': f"07/07/{season}",
+                                             'sportIds': 1}, )
+        gp = gp['stats'][0]['splits']
+        for team in gp:
+            gp_dict[team['team']['id']] = team['stat']['gamesPlayed']
         for my_stat in stats_needed:
             dic = self.get_stat(stat=my_stat[0], group=my_stat[1], season=season)
             for team_id in team_list:
-                if my_stat[0] == 'wins':
-                    my_dict[season * 1000 + team_id]['cur_wins'] = dic[team_id]
-                elif my_stat[0] == 'runs' and my_stat[1] == 'pitching':
-                    my_dict[season * 1000 + team_id]['runs_against'] = dic[team_id]
+                if my_stat[0] in ['avg', 'obp', 'slg', 'ops', 'era', 'whip', 'strikeoutWalkRatio', 'stolenBasePercentage', 'groundOutsToAirouts', 'pitchesPerInning', 'strikeoutsPer9Inn', 'walksPer9Inn', 'hitsPer9Inn', 'runsScoredPer9', 'homeRunsPer9', 'strikePercentage', ]:
+                    if my_stat[1] == 'pitching':
+                        my_dict[season * 1000 + team_id]['p_' + my_stat[0]] = dic[team_id]
+                    else: 
+                        my_dict[season * 1000 + team_id]['h_' + my_stat[0]] = dic[team_id]
                 else:
-                    my_dict[season * 1000 + team_id][my_stat[0]] = dic[team_id]
+                    if my_stat[1] == 'pitching':
+                        my_dict[season * 1000 + team_id]['p_' + my_stat[0]] = dic[team_id]/gp_dict[team_id]
+                    else: 
+                        my_dict[season * 1000 + team_id]['h_' + my_stat[0]] = dic[team_id]/gp_dict[team_id]
         stats = statsapi.get("standings", {'season': season,
                                            'sportIds': 1,
                                            'leagueId': "103,104"})
@@ -63,15 +143,11 @@ class DataProcessor:
 
     def preprocess_data(self):
         y_labels = self.df.pop('wins')
-        mid_season_wins = self.df['cur_wins'].copy()
+        mid_season_wins = self.df['p_wins'].copy()
         scaler = StandardScaler()
         scaled_array = scaler.fit_transform(self.df)
         df_scaled = pd.DataFrame(scaled_array, columns=self.df.columns, index=self.df.index)
         return df_scaled, y_labels, mid_season_wins
-
-    def split_data(self, df_scaled, y_labels, test_size=0.2, random_state=42):
-        return train_test_split(df_scaled, y_labels, test_size=test_size, random_state=random_state)
-
 
 class ModelTrainer:
     def __init__(self):
@@ -143,8 +219,8 @@ class Main:
         # Preprocess training data
         self.data_processor = DataProcessor(filename="mlb_stats_training.csv")
         df_scaled, y_labels, mid_season_wins = self.data_processor.preprocess_data()
-        X_train, X_test, y_train, y_test = self.data_processor.split_data(df_scaled, y_labels)
-
+        X_train = df_scaled
+        y_train = y_labels
         # Train the model
         self.model_trainer.train(X_train, y_train)
 
@@ -235,16 +311,16 @@ class Main:
 
 if __name__ == "__main__":
     main = Main()
-    main.run()
+    # main.run()
 
     ##### For testing full range #####
-    # mid_acc = []
-    # pred_acc = []
-    # for year in range(2008,2025):
-    #     if year != 2020:
-    #         print(f"Running for projection year: {year}")
-    #         main.run(season=year, test=True)
-    #         mid_acc.append(main.midseason_accuracy)
-    #         pred_acc.append(main.prediction_accuracy)
-    # print(f"Overall Midseason Accuracy: {sum(mid_acc)/len(mid_acc)}")
-    # print(f"Overall Prediction Accuracy: {sum(pred_acc)/len(pred_acc)}")
+    mid_acc = []
+    pred_acc = []
+    for year in range(2008,2025):
+        if year != 2020:
+            print(f"Running for projection year: {year}")
+            main.run(season=year, test=True)
+            mid_acc.append(main.midseason_accuracy)
+            pred_acc.append(main.prediction_accuracy)
+    print(f"Overall Midseason Accuracy: {sum(mid_acc)/len(mid_acc)}")
+    print(f"Overall Prediction Accuracy: {sum(pred_acc)/len(pred_acc)}")
