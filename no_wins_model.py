@@ -1,5 +1,5 @@
 import pandas as pd
-from sklearn.linear_model import BayesianRidge, LinearRegression, Ridge
+from sklearn.linear_model import BayesianRidge, LinearRegression, Ridge, RidgeCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
 import statsapi
@@ -33,7 +33,7 @@ class DataFetcher:
             ('runs', 'pitching'),
             ('era', 'pitching'),
             ('whip', 'pitching'),
-            # ('wins', 'pitching'),
+            ('wins', 'pitching'),
             ('strikeoutWalkRatio', 'pitching'),
             ('ops', 'pitching'),
             ('ops', 'hitting'),
@@ -123,6 +123,7 @@ class DataFetcher:
                         my_dict[season * 1000 + team_id]['p_' + my_stat[0]] = dic[team_id]/gp_dict[team_id]
                     else: 
                         my_dict[season * 1000 + team_id]['h_' + my_stat[0]] = dic[team_id]/gp_dict[team_id]
+                        # full season wins
         stats = statsapi.get("standings", {'season': season,
                                            'sportIds': 1,
                                            'leagueId': "103,104"})
@@ -144,9 +145,9 @@ class DataProcessor:
 
     def preprocess_data(self):
         y_labels = self.df.pop('wins')
+        mid_season_wins = self.df.pop('p_wins')
         scaler = StandardScaler()
         scaled_array = scaler.fit_transform(self.df)
-        mid_season_wins = self.df['p_wins'].copy()
         df_scaled = pd.DataFrame(scaled_array, columns=self.df.columns, index=self.df.index)
         return df_scaled, y_labels, mid_season_wins
 
@@ -168,7 +169,7 @@ class ModelTrainer:
         "Compares 3 linear regression models on the set of test and training data provided"
         br = BayesianRidge()
         lr = LinearRegression()
-        rr = Ridge()
+        rr = RidgeCV()
         rmses = []
         mses = []
         for model in [br,lr,rr]:
