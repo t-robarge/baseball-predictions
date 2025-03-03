@@ -198,7 +198,7 @@ class MLBPredictionGUI:
         
         # Preprocess training data
         data_processor = DataProcessor(filename="mlb_stats_training.csv")
-        df_scaled, y_labels = data_processor.preprocess_data()
+        df_scaled, y_labels, mid_season_wins = data_processor.preprocess_data()
         X_train = df_scaled
         y_train = y_labels
         
@@ -207,7 +207,7 @@ class MLBPredictionGUI:
         
         # Preprocess test data
         data_processor = DataProcessor(filename="mlb_stats_test.csv")
-        df_scaled_test, y_labels_test = data_processor.preprocess_data()
+        df_scaled_test, y_labels_test, mid_season_wins = data_processor.preprocess_data()
         
         # Make predictions and evaluate
         y_pred = self.model_trainer.predict(df_scaled_test)

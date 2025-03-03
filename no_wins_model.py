@@ -158,7 +158,7 @@ class ModelTrainer:
     def train(self, X_train, y_train):
         self.model.fit(X_train, y_train)
 
-    def train_and_predict(self, X_test):
+    def predict(self, X_test):
         return self.model.predict(X_test)
 
     def evaluate(self, y_test, y_pred):
