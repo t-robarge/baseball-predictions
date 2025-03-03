@@ -250,13 +250,16 @@ class Main:
         # Add the 'Difference' column
         results_df['Difference'] = results_df['Actual Wins'] - results_df['Predicted Wins']
 
-        # Add division information
-        division_mapping = self.get_division_mapping(projection_year)
+        # Add division information and division ranks
+        division_mapping, division_ranks = self.get_division_mapping(projection_year)
         results_df['Division'] = results_df.index.map(division_mapping)
+        results_df['Division Rank'] = results_df.index.map(division_ranks)
 
-        # Calculate ranking accuracy for mid-season wins and predicted wins
-        predicted_accuracy = self.calculate_ranking_accuracy(results_df['Predicted Wins'], results_df['Actual Wins'])
-        self.prediction_accuracy = predicted_accuracy
+        # Calculate ranking accuracy for predicted wins by division
+        division_accuracies = {}
+        for division, group in results_df.groupby('Division'):
+            predicted_accuracy = self.calculate_ranking_accuracy(group['Predicted Wins'], group['Actual Wins'], group['Division Rank'])
+            division_accuracies[division] = predicted_accuracy
 
         # Sort and display results
         results_df = results_df.sort_values(by=['Division', 'Predicted Wins'], ascending=[True, False])
@@ -264,20 +267,32 @@ class Main:
             print("\nResults for the Projection Year (Grouped by Division, Ordered by Predicted Wins):")
             for division, group in results_df.groupby('Division'):
                 print(f"\n{division}")
-                print(group.drop(columns=['Division']))
-            
-        # Create a new table with division name and both metrics
-        if not self.test:
-            print(f"Predicted Wins Accuracy: {predicted_accuracy*100:.2f}%")
+                print(group.drop(columns=['Division', 'Division Rank']))
+                pred_acc = division_accuracies[division]
+                print(f"Predicted Wins Accuracy: {pred_acc*100:.2f}%")
+        
+        total_pred_acc = sum(acc for acc in division_accuracies.values()) / len(division_accuracies)
+        self.prediction_accuracy = total_pred_acc
 
-    def calculate_ranking_accuracy(self, predicted, actual):
+        if not self.test:
+            print(f"Total Predicted Wins Accuracy: {total_pred_acc*100:.2f}%")
+
+    def calculate_ranking_accuracy(self, predicted, actual, division_ranks):
+        # Convert predicted wins to ranks within each division
+        predicted_ranks = predicted.rank(method='min', ascending=False)
+        
+        # Use the actual division ranks
+        actual_ranks = pd.Series(division_ranks)
+        
         # Calculate Spearman correlation coefficient
-        correlation, _ = spearmanr(predicted, actual)
+        correlation, _ = spearmanr(predicted_ranks, actual_ranks)
         return correlation
+
 
     def get_division_mapping(self, year):
         standings = statsapi.get("standings", {'season': year, 'sportIds': 1, 'leagueId': "103,104"})
         division_mapping = {}
+        division_ranks = {}
         team_id_to_abbreviation = {team_id: abbrev for abbrev, team_id in self.data_fetcher.team_ids.items()}
 
         for division in standings['records']:
@@ -299,19 +314,20 @@ class Main:
             for team in division['teamRecords']:
                 team_abbrev = team_id_to_abbreviation[team['team']['id']]
                 division_mapping[team_abbrev] = division_name
+                division_ranks[team_abbrev] = team['divisionRank']
 
-        return division_mapping
+        return division_mapping, division_ranks
 
 
 if __name__ == "__main__":
     main = Main()
-    # main.run()
+    main.run()
 
     ##### For testing full range #####
-    pred_acc = []
-    for year in range(2008,2025):
-        if year != 2020:
-            print(f"Running for projection year: {year}")
-            main.run(season=year, test=True)
-            pred_acc.append(main.prediction_accuracy)
-    print(f"Overall Prediction Accuracy: {sum(pred_acc)/len(pred_acc)}")
+    # pred_acc = []
+    # for year in range(2008,2025):
+    #     if year != 2020:
+    #         print(f"Running for projection year: {year}")
+    #         main.run(season=year, test=True)
+    #         pred_acc.append(main.prediction_accuracy)
+    # print(f"Overall Prediction Accuracy: {sum(pred_acc)/len(pred_acc)}")
