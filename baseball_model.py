@@ -1,9 +1,10 @@
 import pandas as pd
-from sklearn.linear_model import BayesianRidge
+from sklearn.linear_model import BayesianRidge, LinearRegression, Ridge
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
 import statsapi
 from scipy.stats import spearmanr
+import matplotlib.pyplot as plt
 
 class DataFetcher:
     def __init__(self):
@@ -163,7 +164,60 @@ class ModelTrainer:
         mse = mean_squared_error(y_test, y_pred)
         rmse = mse ** (1 / 2)
         return rmse
-
+    def compare_models(self,X_train,X_test,y_train,y_test):
+        "Compares 3 linear regression models on the set of test and training data provided"
+        br = BayesianRidge()
+        lr = LinearRegression()
+        rr = Ridge()
+        rmses = []
+        mses = []
+        for model in [br,lr,rr]:
+            print(model)
+            model.fit(X_train,y_train)
+            y_pred = model.predict(X_test)
+            print(y_pred)
+            mse = mean_squared_error(y_test,y_pred)
+            rmse = mse**(1/2)
+            mses.append(mse)
+            rmses.append(rmse)  
+        results_rmse = {
+            "Model": ["BayesianRidge", "LinearRegression", "Ridge"],
+            "Metric": rmse
+        }
+        results_mse = {
+            "Model": ["BayesianRidge", "LinearRegression", "Ridge"],
+            "Metric": mse
+        }
+        # rmse
+        df_results = pd.DataFrame(results_rmse)
+        plt.figure(figsize=(8, 5))
+        bars = plt.bar(df_results["Model"], df_results["Metric"], color="skyblue")
+        plt.xlabel("Model")
+        plt.ylabel("RMSE")  
+        plt.title("RMSE Comparison of Regression Models")
+        for bar in bars:
+            height = bar.get_height()
+            plt.annotate(f'{height:.3f}',
+                        xy=(bar.get_x() + bar.get_width() / 2, height),
+                        xytext=(0, 3),  # 3 points vertical offset
+                        textcoords="offset points",
+                        ha='center', va='bottom')
+        plt.savefig("RMSEComparison.png")
+        # mse
+        df_results = pd.DataFrame(results_mse)
+        plt.figure(figsize=(8, 5))
+        bars = plt.bar(df_results["Model"], df_results["Metric"], color="skyblue")
+        plt.xlabel("Model")
+        plt.ylabel("MSE")  
+        plt.title("MSE Comparison of Regression Models")
+        for bar in bars:
+            height = bar.get_height()
+            plt.annotate(f'{height:.3f}',
+                        xy=(bar.get_x() + bar.get_width() / 2, height),
+                        xytext=(0, 3),  # 3 points vertical offset
+                        textcoords="offset points",
+                        ha='center', va='bottom')
+        plt.savefig("MSEComparison.png")
 
 class Main:
     def __init__(self):
@@ -173,6 +227,7 @@ class Main:
         self.midseason_accuracy = None
         self.prediction_accuracy = None
         self.test = False
+        self.display_results = True
 
         # Set pandas display options to prevent truncation
         pd.set_option('display.max_rows', None)
@@ -180,7 +235,9 @@ class Main:
         pd.set_option('display.width', 1000)
         pd.set_option('display.expand_frame_repr', False)
 
-    def run(self, season = None, test = False, ):
+    def run(self, season = None, test = False,display_results=True):
+        if not display_results: self.display_results = False
+
         if test:
             projection_year = season
             self.test = True
@@ -234,8 +291,32 @@ class Main:
         if not self.test: print(f"RMSE for {projection_year}:", rmse)
 
         # Display results
-        self.display_standings(df_scaled_test, y_labels_test, y_pred, mid_season_wins_test, projection_year)
+        if self.print:
+            self.display_standings(df_scaled_test, y_labels_test, y_pred, mid_season_wins_test, projection_year)
+    def run_for_comparison(self,season=None):
+        "creates bar graph comparison of models"
+        # get list of teams
+        if season:
+            projection_year = season
+            self.test = True
+        else:
+            projection_year = self.get_projection_year()
+        season_list = self.get_season_list(projection_year)
+        team_list = self.data_fetcher.team_ids.values()
+        # split data based on test year
+        self.compile_and_export_data(team_list, season_list, projection_year)
+        # Preprocess training data
+        self.data_processor = DataProcessor(filename="mlb_stats_training.csv")
+        df_scaled, y_labels, mid_season_wins = self.data_processor.preprocess_data()
+        X_train = df_scaled
+        y_train = y_labels
+        
+        # Preprocess test data
+        self.data_processor = DataProcessor(filename="mlb_stats_test.csv")
+        df_scaled_test, y_labels_test, mid_season_wins_test = self.data_processor.preprocess_data()
 
+        # Make predictions and evaluate the model
+        self.model_trainer.compare_models(X_train,df_scaled_test,y_train,y_labels_test)
     def display_standings(self, df_scaled_test, y_labels_test, y_pred, mid_season_wins_test, projection_year):
         # Create a mapping of team IDs to abbreviations
         team_id_to_abbreviation = {team_id: abbrev for abbrev, team_id in self.data_fetcher.team_ids.items()}
@@ -312,7 +393,8 @@ class Main:
 if __name__ == "__main__":
     main = Main()
     # main.run()
-
+    main.run_for_comparison(season=2014)
+'''
     ##### For testing full range #####
     mid_acc = []
     pred_acc = []
@@ -324,3 +406,4 @@ if __name__ == "__main__":
             pred_acc.append(main.prediction_accuracy)
     print(f"Overall Midseason Accuracy: {sum(mid_acc)/len(mid_acc)}")
     print(f"Overall Prediction Accuracy: {sum(pred_acc)/len(pred_acc)}")
+'''
