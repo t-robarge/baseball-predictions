@@ -12,7 +12,7 @@ import os
 from PIL import Image, ImageTk
 import io
 import requests
-from sklearn.linear_model import BayesianRidge
+from sklearn.linear_model import BayesianRidge, LinearRegression, RidgeCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
 from scipy.stats import spearmanr
@@ -107,6 +107,17 @@ class MLBPredictionGUI:
         year_combo = ttk.Combobox(year_frame, textvariable=self.year_var, values=years, width=6)
         year_combo.pack(side=tk.LEFT, padx=5)
         
+        # Model selection
+        model_frame = ttk.Frame(control_frame)
+        model_frame.pack(fill=tk.X, pady=10)
+        
+        model_label = ttk.Label(model_frame, text="Model:", style='Data.TLabel')
+        model_label.pack(side=tk.LEFT, padx=5)
+        
+        self.model_var = tk.StringVar(value="BayesianRidge")
+        model_combo = ttk.Combobox(model_frame, textvariable=self.model_var, values=["BayesianRidge", "LinearRegression", "RidgeCV"], width=15)
+        model_combo.pack(side=tk.LEFT, padx=5)
+        
         # Run button
         run_button = ttk.Button(control_frame, text="Run Projection", command=self.run_projection, style='Accent.TButton')
         run_button.pack(fill=tk.X, pady=10)
@@ -162,12 +173,13 @@ class MLBPredictionGUI:
         
         try:
             projection_year = int(self.year_var.get())
+            selected_model = self.model_var.get()
             
             # Run model projection (based on the original code)
-            self.run_model(projection_year)
+            self.run_model(projection_year, selected_model)
             
             # Update status
-            self.status_var.set(f"Projection completed for {projection_year}")
+            self.status_var.set(f"Projection completed for {projection_year} using {selected_model}")
             self.rmse_var.set(f"RMSE: {self.rmse:.2f}")
             self.accuracy_var.set(f"Overall Accuracy: {self.overall_accuracy*100:.2f}%")
             
@@ -180,7 +192,7 @@ class MLBPredictionGUI:
             messagebox.showerror("Error", f"An error occurred: {str(e)}")
             self.status_var.set("Error occurred during projection.")
     
-    def run_model(self, projection_year):
+    def run_model(self, projection_year, selected_model):
         # This follows the logic from the original Main.run() method
         season_list = [i for i in range(2013, 2025) if i != 2020 and i != projection_year]
         team_list = self.data_fetcher.team_ids.values()
@@ -202,7 +214,16 @@ class MLBPredictionGUI:
         X_train = df_scaled
         y_train = y_labels
         
+        # Initialize the selected model
+        if selected_model == "BayesianRidge":
+            model = BayesianRidge()
+        elif selected_model == "LinearRegression":
+            model = LinearRegression()
+        elif selected_model == "RidgeCV":
+            model = RidgeCV()
+        
         # Train the model
+        self.model_trainer = ModelTrainer(model=model)
         self.model_trainer.train(X_train, y_train)
         
         # Preprocess test data
@@ -496,15 +517,9 @@ class MLBPredictionGUI:
             "AL West", "NL West"
         ]
         
-        # Division colors
-        div_colors = {
-            "AL East": plt.cm.Reds,
-            "AL Central": plt.cm.Blues,
-            "AL West": plt.cm.Greens,
-            "NL East": plt.cm.Purples,
-            "NL Central": plt.cm.Oranges,
-            "NL West": plt.cm.YlOrBr
-        }
+        # Define a diverging color scheme (red to blue)
+        cmap = plt.cm.RdBu_r  # Red for overperformance, Blue for underperformance
+        norm = plt.Normalize(-20, 20)  # Adjust range as needed
         
         # Create subplots for each division
         for i, division in enumerate(division_order):
@@ -523,39 +538,42 @@ class MLBPredictionGUI:
                 predicted = div_data['Predicted Wins']
                 diff = div_data['Difference']
                 
-                # Create a color scale based on the difference
-                norm = plt.Normalize(-15, 15)  # Adjust range as needed
-                colors = div_colors.get(division, plt.cm.viridis)(norm(diff))
-                
                 # Create horizontal bar chart
-                bars = ax.barh(teams, predicted, color=colors, alpha=0.7, label='Predicted')
+                bars = ax.barh(teams, predicted, color=cmap(norm(diff)), alpha=0.7, label='Predicted')
                 ax.barh(teams, actual, color='none', edgecolor='black', linestyle='--', 
                         linewidth=2, label='Actual')
                 
-                # Add labels
-                for j, team in enumerate(teams):
-                    ax.text(predicted.iloc[j] + 0.5, j, f'{predicted.iloc[j]:.1f}', 
-                            va='center', ha='left', fontsize=8)
+                # Add labels for predicted wins
+                for j, (team, pred, act) in enumerate(zip(teams, predicted, actual)):
+                    # Determine the furthest point (max between predicted and actual)
+                    furthest_point = max(pred, act)
                     
+                    # Place the label after the furthest point
+                    ax.text(furthest_point + 1, j, f'{pred:.1f}', 
+                            va='center', ha='left', fontsize=8, color='black')
+                
                 # Set title and labels
                 ax.set_title(f'{division} (Acc: {self.division_accuracies[division]*100:.1f}%)')
                 ax.set_xlabel('Wins')
                 ax.set_xlim(0, max(actual.max(), predicted.max()) * 1.1)
                 
-                # Legend
+                # Add a grid for better readability
+                ax.grid(axis='x', linestyle='--', alpha=0.6)
+                
+                # Legend (only for the first subplot)
                 if i == 0:
                     ax.legend(loc='upper right', fontsize=8)
                     
             except Exception as e:
                 # Handle any errors (like division not found)
                 ax.text(0.5, 0.5, f"Error displaying {division}: {str(e)}", 
-                       ha='center', va='center', transform=ax.transAxes)
+                    ha='center', va='center', transform=ax.transAxes)
         
         # Add a color bar to explain the color scale
         cbar_ax = fig.add_axes([0.92, 0.15, 0.02, 0.7])
-        cbar = fig.colorbar(plt.cm.ScalarMappable(norm=norm, cmap=plt.cm.RdBu_r), 
-                          cax=cbar_ax)
-        cbar.set_label('Actual - Predicted Wins\n(Blue = Underperformed, Red = Overperformed)')
+        cbar = fig.colorbar(plt.cm.ScalarMappable(norm=norm, cmap=cmap), 
+                        cax=cbar_ax)
+        cbar.set_label('Actual - Predicted Wins\n(Red = Overperformed, Blue = Underperformed)')
         
         # Add overall title
         fig.suptitle(f'MLB Win Predictions - Year {self.year_var.get()}\nOverall Accuracy: {self.overall_accuracy*100:.2f}%, RMSE: {self.rmse:.2f}', 
@@ -571,26 +589,28 @@ class MLBPredictionGUI:
     def show_help(self):
         help_text = """MLB Win Prediction Visualizer
 
-This application visualizes predictions from a Bayesian Ridge Regression model for MLB team wins.
+    This application visualizes predictions from different regression models for MLB team wins.
 
-How to use:
-1. Select a projection year from the dropdown
-2. Click "Run Projection" to process the data
-3. View results in different tabs:
-   - Division Tables: Detailed tables showing actual vs. predicted wins
-   - Bar Charts: Visual comparison of actual vs. predicted wins by division
-   - Prediction Heatmap: Overview of all divisions with color-coded performance indicators
+    How to use:
+    1. Select a projection year from the dropdown
+    2. Select a model from the dropdown (BayesianRidge, LinearRegression, or RidgeCV)
+    3. Click "Run Projection" to process the data
+    4. View results in different tabs:
+    - Division Tables: Detailed tables showing actual vs. predicted wins
+    - Bar Charts: Visual comparison of actual vs. predicted wins by division
+    - Prediction Heatmap: Overview of all divisions with color-coded performance indicators
 
-Model information:
-- The model uses various MLB statistics (pitching and hitting) from previous seasons
-- The accuracy is measured using Spearman rank correlation within divisions
-- RMSE (Root Mean Square Error) shows the overall prediction accuracy in terms of wins
+    Model information:
+    - BayesianRidge: A Bayesian approach to linear regression
+    - LinearRegression: Ordinary least squares linear regression
+    - RidgeCV: Ridge regression with built-in cross-validation
 
-Data is sourced from the MLB StatsAPI.
-"""
+    The accuracy is measured using Spearman rank correlation within divisions
+    RMSE (Root Mean Square Error) shows the overall prediction accuracy in terms of wins
+
+    Data is sourced from the MLB StatsAPI.
+    """
         messagebox.showinfo("Help & Information", help_text)
-
-
 def main():
     root = tk.Tk()
     app = MLBPredictionGUI(root)
