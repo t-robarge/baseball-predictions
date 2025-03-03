@@ -175,17 +175,19 @@ class ModelTrainer:
         for model in [br,lr,rr]:
             model.fit(X_train,y_train)
             y_pred = model.predict(X_test)
+            print(y_pred)
             mse = mean_squared_error(y_test,y_pred)
+            print(mse)
             rmse = mse**(1/2)
             mses.append(mse)
             rmses.append(rmse)  
         results_rmse = {
             "Model": ["BayesianRidge", "LinearRegression", "Ridge"],
-            "Metric": rmse
+            "Metric": rmses
         }
         results_mse = {
             "Model": ["BayesianRidge", "LinearRegression", "Ridge"],
-            "Metric": mse
+            "Metric": mses
         }
         # rmse
         df_results = pd.DataFrame(results_rmse)
