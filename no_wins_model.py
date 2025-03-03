@@ -145,11 +145,10 @@ class DataProcessor:
 
     def preprocess_data(self):
         y_labels = self.df.pop('wins')
-        mid_season_wins = self.df.pop('p_wins')
         scaler = StandardScaler()
         scaled_array = scaler.fit_transform(self.df)
         df_scaled = pd.DataFrame(scaled_array, columns=self.df.columns, index=self.df.index)
-        return df_scaled, y_labels, mid_season_wins
+        return df_scaled, y_labels
 
 class ModelTrainer:
     def __init__(self, model=LinearRegression()):
@@ -404,13 +403,13 @@ if __name__ == "__main__":
     main.run()
 
     ##### For testing full range #####
-    pred_acc = []
-    for year in range(2008,2025):
-        if year != 2020:
-            print(f"Running for projection year: {year}")
-            main.run(season=year, test=True)
-            pred_acc.append(main.prediction_accuracy)
-    print(f"Overall Prediction Accuracy: {sum(pred_acc)/len(pred_acc)}")
+    # pred_acc = []
+    # for year in range(2008,2025):
+    #     if year != 2020:
+    #         print(f"Running for projection year: {year}")
+    #         main.run(season=year, test=True)
+    #         pred_acc.append(main.prediction_accuracy)
+    # print(f"Overall Prediction Accuracy: {sum(pred_acc)/len(pred_acc)}")
 
     # comparison of models
  
