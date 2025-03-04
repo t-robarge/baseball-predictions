@@ -1,10 +1,10 @@
 import pandas as pd
-from sklearn.linear_model import BayesianRidge, LinearRegression, Ridge, RidgeCV
+import statsapi
+import matplotlib.pyplot as plt
+from sklearn.linear_model import BayesianRidge, LinearRegression, RidgeCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
-import statsapi
 from scipy.stats import spearmanr
-import matplotlib.pyplot as plt
 
 class DataFetcher:
     def __init__(self):
