@@ -30,7 +30,7 @@ class DataFetcher:
 
     def compile_team_data(self, team_list, my_dict, season):
         stats_needed = [
-            ('runs', 'pitching'),
+            # ('runs', 'pitching'),
             ('era', 'pitching'),
             ('whip', 'pitching'),
             ('wins', 'pitching'),
