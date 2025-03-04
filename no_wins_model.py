@@ -5,7 +5,38 @@ from sklearn.metrics import mean_squared_error
 import statsapi
 from scipy.stats import spearmanr
 import matplotlib.pyplot as plt
+from statistics import mean
 
+def generate_model_comparison_graph(main):
+    ##### For testing full range #####
+    rmseBR,rmseRR,rmseLR = [],[],[]
+    for year in range(2008,2025):
+        if year != 2020:
+            print(f"Running for projection year: {year}")
+            br,rr,lr = main.run_for_comparison(season=year)
+            rmseBR.append(br)
+            rmseRR.append(rr)
+            rmseLR.append(lr)
+
+    # comparison of models
+    results_rmse = {
+            "Model": ["BayesianRidge", "LinearRegression", "Ridge"],
+            "Metric": [mean(rmseBR),mean(rmseLR),mean(rmseRR)]
+        }
+    df_results = pd.DataFrame(results_rmse)
+    plt.figure(figsize=(8, 5))
+    bars = plt.bar(df_results["Model"], df_results["Metric"], color="skyblue")
+    plt.xlabel("Model")
+    plt.ylabel("RMSE")  
+    plt.title("RMSE Comparison of Regression Models")
+    for bar in bars:
+        height = bar.get_height()
+        plt.annotate(f'{height:.3f}',
+                    xy=(bar.get_x() + bar.get_width() / 2, height),
+                    xytext=(0, 3),  # 3 points vertical offset
+                    textcoords="offset points",
+                    ha='center', va='bottom')
+    plt.savefig("RMSEComparison.png")
 class DataFetcher:
     def __init__(self):
         self.team_ids = self.get_team_ids()
@@ -189,6 +220,8 @@ class ModelTrainer:
             "Metric": mses
         }
         # rmse
+        return rmses[0],rmses[2],rmses[1]
+    '''
         df_results = pd.DataFrame(results_rmse)
         plt.figure(figsize=(8, 5))
         bars = plt.bar(df_results["Model"], df_results["Metric"], color="skyblue")
@@ -218,6 +251,7 @@ class ModelTrainer:
                         textcoords="offset points",
                         ha='center', va='bottom')
         plt.savefig("MSEComparison.png")
+    '''
 
 class Main:
     def __init__(self):
@@ -303,16 +337,16 @@ class Main:
         self.compile_and_export_data(team_list, season_list, projection_year)
         # Preprocess training data
         self.data_processor = DataProcessor(filename="mlb_stats_training.csv")
-        df_scaled, y_labels, mid_season_wins = self.data_processor.preprocess_data()
+        df_scaled, y_labels = self.data_processor.preprocess_data()
         X_train = df_scaled
         y_train = y_labels
         
         # Preprocess test data
         self.data_processor = DataProcessor(filename="mlb_stats_test.csv")
-        df_scaled_test, y_labels_test, mid_season_wins_test = self.data_processor.preprocess_data()
+        df_scaled_test, y_labels_test = self.data_processor.preprocess_data()
 
         # Make predictions and evaluate the model
-        self.model_trainer.compare_models(X_train,df_scaled_test,y_train,y_labels_test)
+        return self.model_trainer.compare_models(X_train,df_scaled_test,y_train,y_labels_test)
     def display_standings(self, df_scaled_test, y_labels_test, y_pred, projection_year):
         # Create a mapping of team IDs to abbreviations
         team_id_to_abbreviation = {team_id: abbrev for abbrev, team_id in self.data_fetcher.team_ids.items()}
@@ -400,16 +434,5 @@ class Main:
 
 if __name__ == "__main__":
     main = Main()
-    main.run()
-
-    ##### For testing full range #####
-    # pred_acc = []
-    # for year in range(2008,2025):
-    #     if year != 2020:
-    #         print(f"Running for projection year: {year}")
-    #         main.run(season=year, test=True)
-    #         pred_acc.append(main.prediction_accuracy)
-    # print(f"Overall Prediction Accuracy: {sum(pred_acc)/len(pred_acc)}")
-
-    # comparison of models
- 
+    #main.run()
+    
