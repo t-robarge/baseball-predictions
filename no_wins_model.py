@@ -310,7 +310,7 @@ class Main:
 
     def get_season_list(self, projection_year):
         "Returns a list of seasons to be used for training, excluding 2020 (covid) and the projection year (test sample)"
-        return [i for i in range(2013, 2025) if i != 2020 and i != projection_year]
+        return [i for i in range(2008, 2025) if i != 2020 and i != projection_year]
 
     def compile_and_export_data(self, team_list, season_list, projection_year):
         # Compile and export training data
