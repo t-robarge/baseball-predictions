@@ -137,6 +137,19 @@ class MLBPredictionGUI:
         # Help
         help_button = ttk.Button(control_frame, text="Help/About", command=self.show_help)
         help_button.pack(side=tk.BOTTOM, fill=tk.X, pady=10)
+
+        # Display Coefficients
+        self.intercept_var = tk.StringVar(value="Intercept: -")
+        self.coef_var = tk.StringVar(value="Coefficients: -")
+
+        param_frame = ttk.LabelFrame(control_frame, text="Model Parameters", padding=10)
+        param_frame.pack(fill=tk.X, pady=10)
+
+        intercept_label = ttk.Label(param_frame, textvariable=self.intercept_var, style='Data.TLabel')
+        intercept_label.pack(anchor=tk.W, pady=2)
+
+        coef_label = ttk.Label(param_frame, textvariable=self.coef_var, style='Data.TLabel')
+        coef_label.pack(anchor=tk.W, pady=2)
         
         # Right area for results
         self.results_frame = ttk.Notebook(content_frame)
@@ -225,7 +238,14 @@ class MLBPredictionGUI:
         # Train the model
         self.model_trainer = ModelTrainer(model=model)
         self.model_trainer.train(X_train, y_train)
-        
+        # update coefficients on gui
+        model = self.model_trainer.model
+        if hasattr(model, "intercept_") and hasattr(model, "coef_"):
+            intercept_val = model.intercept_
+            coef_val = model.coef_
+            # Convert the coefficients to a string (if many features, consider formatting)
+            self.intercept_var.set(f"Intercept: {intercept_val}")
+            self.coef_var.set(f"Coefficients: {np.array_str(coef_val, precision=3)}")
         # Preprocess test data
         data_processor = DataProcessor(filename="mlb_stats_test.csv")
         df_scaled_test, y_labels_test = data_processor.preprocess_data()
